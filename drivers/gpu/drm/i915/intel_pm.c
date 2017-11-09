@@ -56,6 +56,9 @@
 #define INTEL_RC6p_ENABLE			(1<<1)
 #define INTEL_RC6pp_ENABLE			(1<<2)
 
+#define VLV_RP_UP_EI_THRESHOLD			90
+#define VLV_RP_DOWN_EI_THRESHOLD		70
+
 static void gen9_init_clock_gating(struct drm_i915_private *dev_priv)
 {
 	/* See Bspec note for PSR2_CTL bit 31, Wa#828:skl,bxt,kbl,cfl */
