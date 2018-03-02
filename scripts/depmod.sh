@@ -11,7 +11,7 @@ DEPMOD=$1
 KERNELRELEASE=$2
 
 if ! test -r System.map -a -x "$DEPMOD"; then
-	exit 0
+	exit -1
 fi
 
 # older versions of depmod require the version string to start with three
