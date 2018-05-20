@@ -66,6 +66,12 @@ static const struct drm_dmi_panel_orientation_data vios_lth17 = {
 	.orientation = DRM_MODE_PANEL_ORIENTATION_RIGHT_UP,
 };
 
+static const struct drm_dmi_panel_orientation_data onda_v891w = {
+	.width = 1200,
+	.height = 1920,
+	.orientation = DRM_MODE_PANEL_ORIENTATION_RIGHT_UP,
+};
+
 static const struct dmi_system_id orientation_data[] = {
 	{	/* Asus T100HA */
 		.matches = {
@@ -108,6 +114,12 @@ static const struct dmi_system_id orientation_data[] = {
 		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "LTH17"),
 		},
 		.driver_data = (void *)&vios_lth17,
+	}, {	/* ONDA V891W */
+		.matches = {
+		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "Insyde"),
+		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "ONDA Tablet"),
+		},
+		.driver_data = (void *)&onda_v891w,
 	},
 	{}
 };
