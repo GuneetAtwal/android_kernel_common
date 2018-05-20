@@ -321,8 +321,10 @@ static const struct silead_ts_dmi_data teclast_x5_pro_data = {
 };
 
 static const struct property_entry onda_v891w_props[] = {
-	PROPERTY_ENTRY_U32("touchscreen-size-x", 1625),
-	PROPERTY_ENTRY_U32("touchscreen-size-y", 1135),
+	PROPERTY_ENTRY_U32("silead,min-x", 35),
+	PROPERTY_ENTRY_U32("touchscreen-size-x", 1590),
+	PROPERTY_ENTRY_U32("silead,min-y", 15),
+	PROPERTY_ENTRY_U32("touchscreen-size-y", 1120),
 	PROPERTY_ENTRY_BOOL("touchscreen-inverted-y"),
 	PROPERTY_ENTRY_STRING("firmware-name", "FW_I89_GSL3676B_19201200_.fw"),
 	PROPERTY_ENTRY_U32("silead,max-fingers", 10),
