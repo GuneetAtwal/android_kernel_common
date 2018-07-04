@@ -26,6 +26,9 @@
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/dmi.h>
+#include <linux/input.h>
+#include <linux/gpio/consumer.h>
+#include <linux/gpio/machine.h>
 #include <linux/slab.h>
 #include <asm/cpu_device_id.h>
 #include <asm/intel-family.h>
@@ -511,12 +514,16 @@ static int byt_rt5651_init(struct snd_soc_pcm_runtime *runtime)
 
 	if (BYT_RT5651_JDSRC(byt_rt5651_quirk)) {
 		ret = snd_soc_card_jack_new(runtime->card, "Headset",
-				    SND_JACK_HEADSET, &priv->jack,
-				    bytcr_jack_pins, ARRAY_SIZE(bytcr_jack_pins));
+				    SND_JACK_HEADSET | SND_JACK_BTN_0,
+				    &priv->jack, bytcr_jack_pins,
+				    ARRAY_SIZE(bytcr_jack_pins));
 		if (ret) {
 			dev_err(runtime->dev, "jack creation failed %d\n", ret);
 			return ret;
 		}
+
+		snd_jack_set_key(priv->jack.jack, SND_JACK_BTN_0,
+				 KEY_PLAYPAUSE);
 
 		ret = snd_soc_component_set_jack(codec, &priv->jack, NULL);
 		if (ret)
