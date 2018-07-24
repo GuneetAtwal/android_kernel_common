@@ -334,7 +334,6 @@ enum {
 struct rpcrdma_buffer;
 struct rpcrdma_req {
 	struct list_head	rl_list;
-	int			rl_cpu;
 	unsigned int		rl_connect_cookie;
 	struct rpcrdma_buffer	*rl_buffer;
 	struct rpcrdma_rep	*rl_reply;
@@ -382,7 +381,7 @@ rpcrdma_mr_pop(struct list_head *list)
 	struct rpcrdma_mr *mr;
 
 	mr = list_first_entry(list, struct rpcrdma_mr, mr_list);
-	list_del(&mr->mr_list);
+	list_del_init(&mr->mr_list);
 	return mr;
 }
 

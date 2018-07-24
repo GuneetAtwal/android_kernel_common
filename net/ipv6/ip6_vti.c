@@ -212,10 +212,13 @@ static struct ip6_tnl *vti6_tnl_create(struct net *net, struct __ip6_tnl_parm *p
 	char name[IFNAMSIZ];
 	int err;
 
-	if (p->name[0])
+	if (p->name[0]) {
+		if (!dev_valid_name(p->name))
+			goto failed;
 		strlcpy(name, p->name, IFNAMSIZ);
-	else
+	} else {
 		sprintf(name, "ip6_vti%%d");
+	}
 
 	dev = alloc_netdev(sizeof(*t), name, NET_NAME_UNKNOWN, vti6_dev_setup);
 	if (!dev)
@@ -666,7 +669,7 @@ static void vti6_link_config(struct ip6_tnl *t, bool keep_mtu)
 	else
 		mtu = ETH_DATA_LEN - LL_MAX_HEADER - sizeof(struct ipv6hdr);
 
-	dev->mtu = max_t(int, mtu, IPV6_MIN_MTU);
+	dev->mtu = max_t(int, mtu, IPV4_MIN_MTU);
 }
 
 /**
@@ -878,7 +881,7 @@ static void vti6_dev_setup(struct net_device *dev)
 	dev->priv_destructor = vti6_dev_free;
 
 	dev->type = ARPHRD_TUNNEL6;
-	dev->min_mtu = IPV6_MIN_MTU;
+	dev->min_mtu = IPV4_MIN_MTU;
 	dev->max_mtu = IP_MAX_MTU - sizeof(struct ipv6hdr);
 	dev->flags |= IFF_NOARP;
 	dev->addr_len = sizeof(struct in6_addr);
