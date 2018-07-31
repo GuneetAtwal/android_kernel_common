@@ -658,6 +658,14 @@ static const struct dmi_system_id hpdet_inverted_flag[] = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "Hampoo"),
 			DMI_MATCH(DMI_BOARD_NAME, "Cherry Trail CR")
 		}
+
+	},
+	{
+		.ident = "RDP ThinBook",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "RDP"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "ThinBook")
+		}
 	},
 #endif
 	{}
