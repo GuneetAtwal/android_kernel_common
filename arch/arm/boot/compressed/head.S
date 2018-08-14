@@ -29,19 +29,19 @@
 #if defined(CONFIG_DEBUG_ICEDCC)
 
 #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
-		.macro	loadsp, rb, tmp
+		.macro	loadsp, rb, tmp1, tmp2
 		.endm
 		.macro	writeb, ch, rb
 		mcr	p14, 0, \ch, c0, c5, 0
 		.endm
 #elif defined(CONFIG_CPU_XSCALE)
-		.macro	loadsp, rb, tmp
+		.macro	loadsp, rb, tmp1, tmp2
 		.endm
 		.macro	writeb, ch, rb
 		mcr	p14, 0, \ch, c8, c0, 0
 		.endm
 #else
-		.macro	loadsp, rb, tmp
+		.macro	loadsp, rb, tmp1, tmp2
 		.endm
 		.macro	writeb, ch, rb
 		mcr	p14, 0, \ch, c1, c0, 0
@@ -57,7 +57,7 @@
 		.endm
 
 #if defined(CONFIG_ARCH_SA1100)
-		.macro	loadsp, rb, tmp
+		.macro	loadsp, rb, tmp1, tmp2
 		mov	\rb, #0x80000000	@ physical base address
 #ifdef CONFIG_DEBUG_LL_SER3
 		add	\rb, \rb, #0x00050000	@ Ser3
@@ -66,8 +66,8 @@
 #endif
 		.endm
 #else
-		.macro	loadsp,	rb, tmp
-		addruart \rb, \tmp
+		.macro	loadsp,	rb, tmp1, tmp2
+		addruart \rb, \tmp1, \tmp2
 		.endm
 #endif
 #endif
@@ -559,8 +559,6 @@ not_relocated:	mov	r0, #0
 		bl	decompress_kernel
 		bl	cache_clean_flush
 		bl	cache_off
-		mov	r1, r7			@ restore architecture number
-		mov	r2, r8			@ restore atags pointer
 
 #ifdef CONFIG_ARM_VIRT_EXT
 		mrs	r0, spsr		@ Get saved CPU boot mode
@@ -794,6 +792,8 @@ __armv7_mmu_cache_on:
 		bic     r6, r6, #1 << 31        @ 32-bit translation system
 		bic     r6, r6, #(7 << 0) | (1 << 4)	@ use only ttbr0
 		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+		mcrne	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+		mcr	p15, 0, r0, c7, c5, 4	@ ISB
 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
 		mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
 #endif
@@ -1295,7 +1295,7 @@ phex:		adr	r3, phexbuf
 		b	1b
 
 @ puts corrupts {r0, r1, r2, r3}
-puts:		loadsp	r3, r1
+puts:		loadsp	r3, r2, r1
 1:		ldrb	r2, [r0], #1
 		teq	r2, #0
 		moveq	pc, lr
@@ -1312,8 +1312,8 @@ puts:		loadsp	r3, r1
 @ putc corrupts {r0, r1, r2, r3}
 putc:
 		mov	r2, r0
+		loadsp	r3, r1, r0
 		mov	r0, #0
-		loadsp	r3, r1
 		b	2b
 
 @ memdump corrupts {r0, r1, r2, r3, r10, r11, r12, lr}
@@ -1363,6 +1363,8 @@ __hyp_reentry_vectors:
 
 __enter_kernel:
 		mov	r0, #0			@ must be 0
+		mov	r1, r7			@ restore architecture number
+		mov	r2, r8			@ restore atags pointer
  ARM(		mov	pc, r4		)	@ call kernel
  M_CLASS(	add	r4, r4, #1	)	@ enter in Thumb mode for M class
  THUMB(		bx	r4		)	@ entry point is always ARM for A/R classes

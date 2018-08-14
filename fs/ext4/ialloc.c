@@ -119,6 +119,8 @@ static int ext4_validate_inode_bitmap(struct super_block *sb,
 		return -EFSCORRUPTED;
 
 	ext4_lock_group(sb, block_group);
+	if (buffer_verified(bh))
+		goto verified;
 	blk = ext4_inode_bitmap(sb, desc);
 	if (!ext4_inode_bitmap_csum_verify(sb, block_group, desc, bh,
 					   EXT4_INODES_PER_GROUP(sb) / 8)) {
@@ -130,6 +132,7 @@ static int ext4_validate_inode_bitmap(struct super_block *sb,
 		return 0;
 	}
 	set_buffer_verified(bh);
+verified:
 	ext4_unlock_group(sb, block_group);
 	return 0;
 }
@@ -144,6 +147,7 @@ static struct buffer_head *
 ext4_read_inode_bitmap(struct super_block *sb, ext4_group_t block_group)
 {
 	struct ext4_group_desc *desc;
+	struct ext4_sb_info *sbi = EXT4_SB(sb);
 	struct buffer_head *bh = NULL;
 	ext4_fsblk_t bitmap_blk;
 	int err;
@@ -153,6 +157,12 @@ ext4_read_inode_bitmap(struct super_block *sb, ext4_group_t block_group)
 		return ERR_PTR(-EFSCORRUPTED);
 
 	bitmap_blk = ext4_inode_bitmap(sb, desc);
+	if ((bitmap_blk <= le32_to_cpu(sbi->s_es->s_first_data_block)) ||
+	    (bitmap_blk >= ext4_blocks_count(sbi->s_es))) {
+		ext4_error(sb, "Invalid inode bitmap blk %llu in "
+			   "block_group %u", bitmap_blk, block_group);
+		return ERR_PTR(-EFSCORRUPTED);
+	}
 	bh = sb_getblk(sb, bitmap_blk);
 	if (unlikely(!bh)) {
 		ext4_error(sb, "Cannot read inode bitmap - "
@@ -170,18 +180,24 @@ ext4_read_inode_bitmap(struct super_block *sb, ext4_group_t block_group)
 	}
 
 	ext4_lock_group(sb, block_group);
-	if (desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT)) {
-		err = ext4_init_inode_bitmap(sb, bh, block_group, desc);
+	if (ext4_has_group_desc_csum(sb) &&
+	    (desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT))) {
+		if (block_group == 0) {
+			ext4_unlock_group(sb, block_group);
+			unlock_buffer(bh);
+			ext4_error(sb, "Inode bitmap for bg 0 marked "
+				   "uninitialized");
+			err = -EFSCORRUPTED;
+			goto out;
+		}
+		memset(bh->b_data, 0, (EXT4_INODES_PER_GROUP(sb) + 7) / 8);
+		ext4_mark_bitmap_end(EXT4_INODES_PER_GROUP(sb),
+				     sb->s_blocksize * 8, bh->b_data);
 		set_bitmap_uptodate(bh);
 		set_buffer_uptodate(bh);
 		set_buffer_verified(bh);
 		ext4_unlock_group(sb, block_group);
 		unlock_buffer(bh);
-		if (err) {
-			ext4_error(sb, "Failed to init inode bitmap for group "
-				   "%u: %d", block_group, err);
-			goto out;
-		}
 		return bh;
 	}
 	ext4_unlock_group(sb, block_group);
@@ -795,6 +811,8 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
 #ifdef CONFIG_EXT4_FS_POSIX_ACL
 		struct posix_acl *p = get_acl(dir, ACL_TYPE_DEFAULT);
 
+		if (IS_ERR(p))
+			return ERR_CAST(p);
 		if (p) {
 			int acl_size = p->a_count * sizeof(ext4_acl_entry);
 
@@ -1011,7 +1029,8 @@ got:
 
 		/* recheck and clear flag under lock if we still need to */
 		ext4_lock_group(sb, group);
-		if (gdp->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
+		if (ext4_has_group_desc_csum(sb) &&
+		    (gdp->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT))) {
 			gdp->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
 			ext4_free_group_clusters_set(sb, gdp,
 				ext4_free_clusters_after_init(sb, group, gdp));
@@ -1395,7 +1414,10 @@ int ext4_init_inode_table(struct super_block *sb, ext4_group_t group,
 			    ext4_itable_unused_count(sb, gdp)),
 			    sbi->s_inodes_per_block);
 
-	if ((used_blks < 0) || (used_blks > sbi->s_itb_per_group)) {
+	if ((used_blks < 0) || (used_blks > sbi->s_itb_per_group) ||
+	    ((group == 0) && ((EXT4_INODES_PER_GROUP(sb) -
+			       ext4_itable_unused_count(sb, gdp)) <
+			      EXT4_FIRST_INO(sb)))) {
 		ext4_error(sb, "Something is wrong with group %u: "
 			   "used itable blocks: %d; "
 			   "itable unused count: %u",

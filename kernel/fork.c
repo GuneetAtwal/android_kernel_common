@@ -90,6 +90,7 @@
 #include <linux/kcov.h>
 #include <linux/livepatch.h>
 #include <linux/thread_info.h>
+#include <linux/cpufreq_times.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -215,10 +216,9 @@ static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
 		if (!s)
 			continue;
 
-#ifdef CONFIG_DEBUG_KMEMLEAK
 		/* Clear stale pointers from reused stack. */
 		memset(s->addr, 0, THREAD_SIZE);
-#endif
+
 		tsk->stack_vm_area = s;
 		return s->addr;
 	}
@@ -367,6 +367,8 @@ void put_task_stack(struct task_struct *tsk)
 
 void free_task(struct task_struct *tsk)
 {
+	cpufreq_task_times_exit(tsk);
+
 #ifndef CONFIG_THREAD_INFO_IN_TASK
 	/*
 	 * The task is finally done with both the stack and thread_info,
@@ -469,7 +471,7 @@ void __init fork_init(void)
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep = kmem_cache_create("task_struct",
 			arch_task_struct_size, align,
-			SLAB_PANIC|SLAB_NOTRACK|SLAB_ACCOUNT, NULL);
+			SLAB_PANIC|SLAB_ACCOUNT, NULL);
 #endif
 
 	/* do the arch specific task caches init */
@@ -721,8 +723,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			goto out;
 	}
 	/* a new mm has just been created */
-	arch_dup_mmap(oldmm, mm);
-	retval = 0;
+	retval = arch_dup_mmap(oldmm, mm);
 out:
 	up_write(&mm->mmap_sem);
 	flush_tlb_mm(oldmm);
@@ -1596,6 +1597,8 @@ static __latent_entropy struct task_struct *copy_process(
 	if (!p)
 		goto fork_out;
 
+	cpufreq_task_times_init(p);
+
 	/*
 	 * This _must_ happen before we call free_task(), i.e. before we jump
 	 * to any of the bad_fork_* labels. This is to avoid freeing
@@ -2057,6 +2060,8 @@ long _do_fork(unsigned long clone_flags,
 		struct completion vfork;
 		struct pid *pid;
 
+		cpufreq_task_times_alloc(p);
+
 		trace_sched_process_fork(current, p);
 
 		pid = get_task_pid(p, PIDTYPE_PID);
@@ -2209,18 +2214,18 @@ void __init proc_caches_init(void)
 	sighand_cachep = kmem_cache_create("sighand_cache",
 			sizeof(struct sighand_struct), 0,
 			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_TYPESAFE_BY_RCU|
-			SLAB_NOTRACK|SLAB_ACCOUNT, sighand_ctor);
+			SLAB_ACCOUNT, sighand_ctor);
 	signal_cachep = kmem_cache_create("signal_cache",
 			sizeof(struct signal_struct), 0,
-			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK|SLAB_ACCOUNT,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_ACCOUNT,
 			NULL);
 	files_cachep = kmem_cache_create("files_cache",
 			sizeof(struct files_struct), 0,
-			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK|SLAB_ACCOUNT,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_ACCOUNT,
 			NULL);
 	fs_cachep = kmem_cache_create("fs_cache",
 			sizeof(struct fs_struct), 0,
-			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK|SLAB_ACCOUNT,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_ACCOUNT,
 			NULL);
 	/*
 	 * FIXME! The "sizeof(struct mm_struct)" currently includes the
@@ -2231,7 +2236,7 @@ void __init proc_caches_init(void)
 	 */
 	mm_cachep = kmem_cache_create("mm_struct",
 			sizeof(struct mm_struct), ARCH_MIN_MMSTRUCT_ALIGN,
-			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK|SLAB_ACCOUNT,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_ACCOUNT,
 			NULL);
 	vm_area_cachep = KMEM_CACHE(vm_area_struct, SLAB_PANIC|SLAB_ACCOUNT);
 	mmap_init();

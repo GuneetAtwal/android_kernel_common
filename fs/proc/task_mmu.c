@@ -130,6 +130,56 @@ static void release_task_mempolicy(struct proc_maps_private *priv)
 }
 #endif
 
+static void seq_print_vma_name(struct seq_file *m, struct vm_area_struct *vma)
+{
+	const char __user *name = vma_get_anon_name(vma);
+	struct mm_struct *mm = vma->vm_mm;
+
+	unsigned long page_start_vaddr;
+	unsigned long page_offset;
+	unsigned long num_pages;
+	unsigned long max_len = NAME_MAX;
+	int i;
+
+	page_start_vaddr = (unsigned long)name & PAGE_MASK;
+	page_offset = (unsigned long)name - page_start_vaddr;
+	num_pages = DIV_ROUND_UP(page_offset + max_len, PAGE_SIZE);
+
+	seq_puts(m, "[anon:");
+
+	for (i = 0; i < num_pages; i++) {
+		int len;
+		int write_len;
+		const char *kaddr;
+		long pages_pinned;
+		struct page *page;
+
+		pages_pinned = get_user_pages_remote(current, mm,
+				page_start_vaddr, 1, 0, &page, NULL, NULL);
+		if (pages_pinned < 1) {
+			seq_puts(m, "<fault>]");
+			return;
+		}
+
+		kaddr = (const char *)kmap(page);
+		len = min(max_len, PAGE_SIZE - page_offset);
+		write_len = strnlen(kaddr + page_offset, len);
+		seq_write(m, kaddr + page_offset, write_len);
+		kunmap(page);
+		put_page(page);
+
+		/* if strnlen hit a null terminator then we're done */
+		if (write_len != len)
+			break;
+
+		max_len -= len;
+		page_offset = 0;
+		page_start_vaddr += PAGE_SIZE;
+	}
+
+	seq_putc(m, ']');
+}
+
 static void vma_stop(struct proc_maps_private *priv)
 {
 	struct mm_struct *mm = priv->mm;
@@ -349,8 +399,15 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 			goto done;
 		}
 
-		if (is_stack(vma))
+		if (is_stack(vma)) {
 			name = "[stack]";
+			goto done;
+		}
+
+		if (vma_get_anon_name(vma)) {
+			seq_pad(m, ' ');
+			seq_print_vma_name(m, vma);
+		}
 	}
 
 done:
@@ -798,6 +855,11 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 
 	if (!rollup_mode) {
 		show_map_vma(m, vma, is_pid);
+		if (vma_get_anon_name(vma)) {
+			seq_puts(m, "Name:           ");
+			seq_print_vma_name(m, vma);
+			seq_putc(m, '\n');
+		}
 	} else if (last_vma) {
 		show_vma_header_prefix(
 			m, mss->first_vma_start, vma->vm_end, 0, 0, 0, 0);
@@ -850,7 +912,7 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 			   mss->private_hugetlb >> 10,
 			   mss->swap >> 10,
 			   (unsigned long)(mss->swap_pss >> (10 + PSS_SHIFT)),
-			   (unsigned long)(mss->pss >> (10 + PSS_SHIFT)));
+			   (unsigned long)(mss->pss_locked >> (10 + PSS_SHIFT)));
 
 	if (!rollup_mode) {
 		arch_show_smap(m, vma);
@@ -1275,8 +1337,9 @@ static pagemap_entry_t pte_to_pagemap_entry(struct pagemapread *pm,
 		if (pte_swp_soft_dirty(pte))
 			flags |= PM_SOFT_DIRTY;
 		entry = pte_to_swp_entry(pte);
-		frame = swp_type(entry) |
-			(swp_offset(entry) << MAX_SWAPFILES_SHIFT);
+		if (pm->show_pfn)
+			frame = swp_type(entry) |
+				(swp_offset(entry) << MAX_SWAPFILES_SHIFT);
 		flags |= PM_SWAP;
 		if (is_migration_entry(entry))
 			page = migration_entry_to_page(entry);
@@ -1327,9 +1390,14 @@ static int pagemap_pmd_range(pmd_t *pmdp, unsigned long addr, unsigned long end,
 #ifdef CONFIG_ARCH_ENABLE_THP_MIGRATION
 		else if (is_swap_pmd(pmd)) {
 			swp_entry_t entry = pmd_to_swp_entry(pmd);
+			unsigned long offset;
 
-			frame = swp_type(entry) |
-				(swp_offset(entry) << MAX_SWAPFILES_SHIFT);
+			if (pm->show_pfn) {
+				offset = swp_offset(entry) +
+					((addr & ~PMD_MASK) >> PAGE_SHIFT);
+				frame = swp_type(entry) |
+					(offset << MAX_SWAPFILES_SHIFT);
+			}
 			flags |= PM_SWAP;
 			if (pmd_swp_soft_dirty(pmd))
 				flags |= PM_SOFT_DIRTY;
@@ -1347,8 +1415,12 @@ static int pagemap_pmd_range(pmd_t *pmdp, unsigned long addr, unsigned long end,
 			err = add_to_pagemap(addr, &pme, pm);
 			if (err)
 				break;
-			if (pm->show_pfn && (flags & PM_PRESENT))
-				frame++;
+			if (pm->show_pfn) {
+				if (flags & PM_PRESENT)
+					frame++;
+				else if (flags & PM_SWAP)
+					frame += (1 << MAX_SWAPFILES_SHIFT);
+			}
 		}
 		spin_unlock(ptl);
 		return err;

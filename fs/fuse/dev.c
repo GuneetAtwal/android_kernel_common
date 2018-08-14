@@ -14,6 +14,7 @@
 #include <linux/sched/signal.h>
 #include <linux/uio.h>
 #include <linux/miscdevice.h>
+#include <linux/namei.h>
 #include <linux/pagemap.h>
 #include <linux/file.h>
 #include <linux/slab.h>
@@ -21,6 +22,7 @@
 #include <linux/swap.h>
 #include <linux/splice.h>
 #include <linux/sched.h>
+#include <linux/freezer.h>
 
 MODULE_ALIAS_MISCDEV(FUSE_MINOR);
 MODULE_ALIAS("devname:fuse");
@@ -381,8 +383,7 @@ static void request_end(struct fuse_conn *fc, struct fuse_req *req)
 		if (!fc->blocked && waitqueue_active(&fc->blocked_waitq))
 			wake_up(&fc->blocked_waitq);
 
-		if (fc->num_background == fc->congestion_threshold &&
-		    fc->connected && fc->sb) {
+		if (fc->num_background == fc->congestion_threshold && fc->sb) {
 			clear_bdi_congested(fc->sb->s_bdi, BLK_RW_SYNC);
 			clear_bdi_congested(fc->sb->s_bdi, BLK_RW_ASYNC);
 		}
@@ -454,7 +455,9 @@ static void request_wait_answer(struct fuse_conn *fc, struct fuse_req *req)
 	 * Either request is already in userspace, or it was forced.
 	 * Wait it out.
 	 */
-	wait_event(req->waitq, test_bit(FR_FINISHED, &req->flags));
+	while (!test_bit(FR_FINISHED, &req->flags))
+		wait_event_freezable(req->waitq,
+				test_bit(FR_FINISHED, &req->flags));
 }
 
 static void __fuse_request_send(struct fuse_conn *fc, struct fuse_req *req)
@@ -1887,6 +1890,12 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 		cs->move_pages = 0;
 
 	err = copy_out_args(cs, &req->out, nbytes);
+	if (req->in.h.opcode == FUSE_CANONICAL_PATH) {
+		char *path = (char *)req->out.args[0].value;
+
+		path[req->out.args[0].size - 1] = 0;
+		req->out.h.error = kern_path(path, 0, req->canonical_path);
+	}
 	fuse_copy_finish(cs);
 
 	spin_lock(&fpq->lock);
