@@ -2845,8 +2845,9 @@ static void nested_vmx_setup_ctls_msrs(struct vcpu_vmx *vmx)
 		 * Advertise EPTP switching unconditionally
 		 * since we emulate it
 		 */
-		vmx->nested.nested_vmx_vmfunc_controls =
-			VMX_VMFUNC_EPTP_SWITCHING;
+		if (enable_ept)
+			vmx->nested.nested_vmx_vmfunc_controls =
+				VMX_VMFUNC_EPTP_SWITCHING;
 	}
 
 	/*
@@ -6750,12 +6751,7 @@ static __init int hardware_setup(void)
 	memset(vmx_vmread_bitmap, 0xff, PAGE_SIZE);
 	memset(vmx_vmwrite_bitmap, 0xff, PAGE_SIZE);
 
-	/*
-	 * Allow direct access to the PC debug port (it is often used for I/O
-	 * delays, but the vmexits simply slow things down).
-	 */
 	memset(vmx_io_bitmap_a, 0xff, PAGE_SIZE);
-	clear_bit(0x80, vmx_io_bitmap_a);
 
 	memset(vmx_io_bitmap_b, 0xff, PAGE_SIZE);
 
