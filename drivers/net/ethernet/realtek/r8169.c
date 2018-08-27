@@ -7312,8 +7312,10 @@ static int rtl8169_suspend(struct device *device)
 {
 	struct pci_dev *pdev = to_pci_dev(device);
 	struct net_device *dev = pci_get_drvdata(pdev);
+	struct rtl8169_private *tp = netdev_priv(dev);
 
 	rtl8169_net_suspend(dev);
+	clk_disable_unprepare(tp->clk);
 
 	return 0;
 }
@@ -7340,6 +7342,7 @@ static int rtl8169_resume(struct device *device)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct rtl8169_private *tp = netdev_priv(dev);
 
+	clk_prepare_enable(tp->clk);
 	rtl8169_init_phy(dev, tp);
 
 	if (netif_running(dev))
