@@ -224,4 +224,5 @@ source "drivers/energy_model/Kconfig"
 
 source "drivers/vbs/Kconfig"
 
+source "drivers/acrn/Kconfig"
 endmenu
