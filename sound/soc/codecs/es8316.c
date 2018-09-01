@@ -544,7 +544,7 @@ static void es8316_sync_spk_status(struct snd_soc_component *component)
 {
 	struct es8316_priv *es8316 = snd_soc_component_get_drvdata(component);
 	unsigned int data;
- 	data = snd_soc_component_read(component, ES8316_GPIO_FLAG);
+ 	data = snd_soc_component_read32(component, ES8316_GPIO_FLAG);
 	dev_info(component->dev, "Status: %u / HPIns %u / GMShrt %u / OUT: %d\n", data, !!(data & BIT(2)), !!(data & BIT(1)), !(!!(data & BIT(2)) ^ es8316->hpdet_inv_flag));
  	gpiod_set_value(es8316->gpiod_spken, !(!!(data & BIT(2)) ^ es8316->hpdet_inv_flag));
 }
@@ -597,7 +597,7 @@ static int es8316_probe(struct snd_soc_component *component)
 	}
  	return 0;
 }
- static int es8316_remove(struct snd_soc_component *component)
+static int es8316_remove(struct snd_soc_component *component)
 {
 	struct es8316_priv *es8316 = snd_soc_component_get_drvdata(component);
  	if (es8316->hp_irq && es8316->gpiod_spken) {
