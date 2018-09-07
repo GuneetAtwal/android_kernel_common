@@ -446,8 +446,27 @@ static int dw_i2c_plat_resume(struct device *dev)
 {
 	struct dw_i2c_dev *i_dev = dev_get_drvdata(dev);
 
+	if (i_dev->shared_with_punit)
+		return 0;
+
+	i2c_dw_prepare_clk(i_dev, true);
+	i_dev->init(i_dev);
+
+	return 0;
+}
+
+/*
+ * This is only for (Intel BYT/CHT) devices where the I2C bus to the PMIC
+ * is shared with the SoC's PUNIT. On these devices the controller is never
+ * turned off by us, but is automatically powered down in hardware. So we
+ * need to re-init it and we need to do this as early as possible.
+ */
+static int dw_i2c_plat_resume_noirq(struct device *dev)
+{
+	struct dw_i2c_dev *i_dev = dev_get_drvdata(dev);
+
 	if (!i_dev->shared_with_punit)
-		i2c_dw_prepare_clk(i_dev, true);
+		return 0;
 
 	i_dev->init(i_dev);
 
@@ -457,6 +476,7 @@ static int dw_i2c_plat_resume(struct device *dev)
 static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
 	.prepare = dw_i2c_plat_prepare,
 	.complete = dw_i2c_plat_complete,
+	.resume_noirq = dw_i2c_plat_resume_noirq,
 	SET_LATE_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
 	SET_RUNTIME_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume, NULL)
 };
