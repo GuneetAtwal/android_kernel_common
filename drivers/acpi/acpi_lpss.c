@@ -486,13 +486,6 @@ static bool acpi_lpss_is_supplier(struct acpi_device *adev,
 			     link->supplier_hid, link->supplier_uid);
 }
 
-static bool acpi_lpss_is_consumer(struct acpi_device *adev,
-				  const struct lpss_device_links *link)
-{
-	return hid_uid_match(acpi_device_hid(adev), acpi_device_uid(adev),
-			     link->consumer_hid, link->consumer_uid);
-}
-
 struct hid_uid {
 	const char *hid;
 	const char *uid;
@@ -562,21 +555,6 @@ static void acpi_lpss_link_consumer(struct device *dev1,
 	put_device(dev2);
 }
 
-static void acpi_lpss_link_supplier(struct device *dev1,
-				    const struct lpss_device_links *link)
-{
-	struct device *dev2;
-
-	dev2 = acpi_lpss_find_device(link->supplier_hid, link->supplier_uid);
-	if (!dev2)
-		return;
-
-	if (acpi_lpss_dep(ACPI_COMPANION(dev1), ACPI_HANDLE(dev2)))
-		device_link_add(dev1, dev2, link->flags);
-
-	put_device(dev2);
-}
-
 static void acpi_lpss_create_device_links(struct acpi_device *adev,
 					  struct platform_device *pdev)
 {
@@ -587,9 +565,6 @@ static void acpi_lpss_create_device_links(struct acpi_device *adev,
 
 		if (acpi_lpss_is_supplier(adev, link))
 			acpi_lpss_link_consumer(&pdev->dev, link);
-
-		if (acpi_lpss_is_consumer(adev, link))
-			acpi_lpss_link_supplier(&pdev->dev, link);
 	}
 }
 
