@@ -553,8 +553,11 @@ static void acpi_lpss_link_consumer(struct device *dev1,
 	if (!dev2)
 		return;
 
-	if (acpi_lpss_dep(ACPI_COMPANION(dev2), ACPI_HANDLE(dev1)))
+	if (acpi_lpss_dep(ACPI_COMPANION(dev2), ACPI_HANDLE(dev1))) {
+		pr_err("Adding %s -> %s link / pm-dependency\n",
+		       dev_name(dev2), dev_name(dev1));
 		device_link_add(dev2, dev1, link->flags);
+	}
 
 	put_device(dev2);
 }
