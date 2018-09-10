@@ -1,7 +1,15 @@
-// SPDX-License-Identifier: GPL-2.0
 /******************************************************************************
  *
  * Copyright(c) 2007 - 2012 Realtek Corporation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
  ******************************************************************************/
 #define _HCI_INTF_C_
@@ -330,7 +338,7 @@ static struct adapter *rtw_sdio_if1_init(struct dvobj_priv *dvobj, const struct 
 	struct adapter *padapter = NULL;
 	PSDIO_DATA psdio = &dvobj->intf_data;
 
-	padapter = vzalloc(sizeof(*padapter));
+	padapter = (struct adapter *)vzalloc(sizeof(*padapter));
 	if (padapter == NULL) {
 		goto exit;
 	}
