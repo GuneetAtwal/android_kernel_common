@@ -7251,6 +7251,12 @@ S:	Maintained
 F:	drivers/media/pci/intel/ipu3/
 F:	Documentation/media/uapi/v4l/pixfmt-srggb10-ipu3.rst
 
+INTEL ISP DUMMY DRIVER
+M:	Hans de Goede <hdegoede@redhat.com>
+L:	platform-driver-x86@vger.kernel.org
+S:	Maintained
+F:	drivers/platform/x86/intel_isp_dummy.c
+
 INTEL IXP4XX QMGR, NPE, ETHERNET and HSS SUPPORT
 M:	Krzysztof Halasa <khalasa@piap.pl>
 S:	Maintained
