@@ -1133,6 +1133,7 @@ void __weak arch_enable_nonboot_cpus_end(void)
 void enable_nonboot_cpus(void)
 {
 	int cpu, error;
+	struct device *cpu_device;
 
 	/* Allow everyone to use the CPU hotplug again */
 	cpu_maps_update_begin();
@@ -1150,6 +1151,12 @@ void enable_nonboot_cpus(void)
 		trace_suspend_resume(TPS("CPU_ON"), cpu, false);
 		if (!error) {
 			pr_info("CPU%d is up\n", cpu);
+			cpu_device = get_cpu_device(cpu);
+			if (!cpu_device)
+				pr_err("%s: failed to get cpu%d device\n",
+				       __func__, cpu);
+			else
+				kobject_uevent(&cpu_device->kobj, KOBJ_ONLINE);
 			continue;
 		}
 		pr_warn("Error taking CPU%d up: %d\n", cpu, error);
@@ -1289,11 +1296,6 @@ static struct cpuhp_step cpuhp_bp_states[] = {
 		.teardown.single	= NULL,
 		.cant_stop		= true,
 	},
-	[CPUHP_AP_SMPCFD_DYING] = {
-		.name			= "smpcfd:dying",
-		.startup.single		= NULL,
-		.teardown.single	= smpcfd_dying_cpu,
-	},
 	/*
 	 * Handled on controll processor until the plugged processor manages
 	 * this itself.
@@ -1334,6 +1336,11 @@ static struct cpuhp_step cpuhp_ap_states[] = {
 		.name			= "RCU/tree:dying",
 		.startup.single		= NULL,
 		.teardown.single	= rcutree_dying_cpu,
+	},
+	[CPUHP_AP_SMPCFD_DYING] = {
+		.name			= "smpcfd:dying",
+		.startup.single		= NULL,
+		.teardown.single	= smpcfd_dying_cpu,
 	},
 	/* Entry state on starting. Interrupts enabled from here on. Transient
 	 * state for synchronsization */
